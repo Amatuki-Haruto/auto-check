@@ -1,53 +1,28 @@
 """
-価格履歴の保存・読み込み
-DATABASE_URL が設定されていれば PostgreSQL、なければ JSON ファイルを使用
+価格履歴の保存・読み込み（PostgreSQL）
 """
 import json
 import logging
-from pathlib import Path
 from datetime import datetime
 
-from filelock import FileLock
-
 from config import MAX_RECORDS, DATABASE_URL
+from db import get_db, init_db
 
 logger = logging.getLogger(__name__)
 
-# JSON 用
-DATA_FILE = Path(__file__).parent / "price_history.json"
-LOCK_FILE = Path(__file__).parent / "price_history.json.lock"
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL が設定されていません。Render でデプロイしてください。")
 
-_use_db = bool(DATABASE_URL)
-
-if _use_db:
-    from db import get_db, init_db
-    init_db()
-
-
-def _load_json() -> list[dict]:
-    with FileLock(LOCK_FILE, timeout=10):
-        if not DATA_FILE.exists():
-            return []
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-
-def _save_json(records: list[dict]):
-    with FileLock(LOCK_FILE, timeout=10):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(records, f, ensure_ascii=False, indent=2)
+init_db()
 
 
 def load_history() -> list[dict]:
     """価格履歴を読み込む"""
-    if _use_db:
-        from db import get_db
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT timestamp, items FROM price_records ORDER BY timestamp ASC")
-                rows = cur.fetchall()
-                return [{"timestamp": r[0].isoformat(), "items": r[1]} for r in rows]
-    return _load_json()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT timestamp, items FROM price_records ORDER BY timestamp ASC")
+            rows = cur.fetchall()
+            return [{"timestamp": r[0].isoformat(), "items": r[1]} for r in rows]
 
 
 def add_price_record(prices: dict[str, dict]) -> dict:
@@ -59,36 +34,20 @@ def add_price_record(prices: dict[str, dict]) -> dict:
         "timestamp": datetime.now().isoformat(),
         "items": prices,
     }
-    if _use_db:
-        from db import get_db
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO price_records (timestamp, items) VALUES (%s, %s)",
-                    (datetime.now(), json.dumps(prices, ensure_ascii=False))
-                )
-                cur.execute(
-                    "SELECT COUNT(*) FROM price_records"
-                )
-                count = cur.fetchone()[0]
-                if count > MAX_RECORDS:
-                    cur.execute("""
-                        DELETE FROM price_records WHERE id IN (
-                            SELECT id FROM price_records ORDER BY timestamp ASC LIMIT %s
-                        )
-                    """, (count - MAX_RECORDS,))
-    else:
-        with FileLock(LOCK_FILE, timeout=10):
-            if not DATA_FILE.exists():
-                history = []
-            else:
-                with open(DATA_FILE, "r", encoding="utf-8") as f:
-                    history = json.load(f)
-            history.append(record)
-            if len(history) > MAX_RECORDS:
-                history = history[-MAX_RECORDS:]
-            with open(DATA_FILE, "w", encoding="utf-8") as f:
-                json.dump(history, f, ensure_ascii=False, indent=2)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO price_records (timestamp, items) VALUES (%s, %s)",
+                (datetime.now(), json.dumps(prices, ensure_ascii=False))
+            )
+            cur.execute("SELECT COUNT(*) FROM price_records")
+            count = cur.fetchone()[0]
+            if count > MAX_RECORDS:
+                cur.execute("""
+                    DELETE FROM price_records WHERE id IN (
+                        SELECT id FROM price_records ORDER BY timestamp ASC LIMIT %s
+                    )
+                """, (count - MAX_RECORDS,))
     return record
 
 

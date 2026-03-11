@@ -1,21 +1,30 @@
 """
-保存したあるけみすと.htmlから初回データを投入するスクリプト
-使い方: python init_from_html.py /path/to/あるけみすと.html
+保存したあるけみすと.htmlから初回データを投入
+Render の /api/push_prices に送信する
+使い方:
+  export RENDER_URL=https://your-app.onrender.com
+  export API_SECRET=your-secret
+  python init_from_html.py /path/to/あるけみすと.html
 """
+import os
 import sys
-import json
 from pathlib import Path
 
-# プロジェクトルートをパスに追加
 sys.path.insert(0, str(Path(__file__).parent))
 
 from scraper import parse_prices
-from data_store import add_price_record
+import requests
 
 
 def main():
     if len(sys.argv) < 2:
         print("Usage: python init_from_html.py /path/to/あるけみすと.html")
+        print("  RENDER_URL と API_SECRET を環境変数に設定してください")
+        sys.exit(1)
+    render_url = os.environ.get("RENDER_URL", "").rstrip("/")
+    api_secret = os.environ.get("API_SECRET", "")
+    if not render_url or not api_secret:
+        print("Error: RENDER_URL と API_SECRET を環境変数に設定してください")
         sys.exit(1)
     html_path = Path(sys.argv[1])
     if not html_path.exists():
@@ -27,10 +36,26 @@ def main():
     if not prices:
         print("No prices found in HTML")
         sys.exit(1)
-    add_price_record(prices)
-    print(f"Added {len(prices)} items from {html_path}")
-    if "こんぼう" in prices:
-        print("  こんぼう:", prices["こんぼう"])
+    url = f"{render_url}/api/push_prices"
+    try:
+        resp = requests.post(
+            url,
+            json={"prices": prices},
+            headers={"X-API-Secret": api_secret, "Content-Type": "application/json"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("success"):
+            print(f"Sent {len(prices)} items to {render_url}")
+            if "こんぼう" in prices:
+                print("  こんぼう:", prices["こんぼう"])
+        else:
+            print("Error:", data.get("error", "不明"))
+            sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

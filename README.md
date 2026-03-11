@@ -1,6 +1,8 @@
 # あるけみすと 市場価格変動確認
 
-## 起動方法
+Render にデプロイして表示。データは `push_data.py` で送信する。
+
+## データ送信
 
 ```bash
 cd auto-check
@@ -9,10 +11,10 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-`cookies.json` に `sessionid` と `csrftoken` を設定してから:
+`cookies.json` に `sessionid` と `csrftoken` を設定し、環境変数を設定してから:
 
 ```bash
-python app.py
+export RENDER_URL=https://your-app.onrender.com
+export API_SECRET=your-secret
+python push_data.py
 ```
-
-ブラウザで http://127.0.0.1:5001 を開く。

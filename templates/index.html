@@ -92,10 +92,6 @@
     th { text-align: left; padding: 0.75rem 1rem; background: rgba(255,255,255,0.03); font-weight: 600; color: var(--text-muted); font-size: 0.8rem; }
     td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
     tr:hover td { background: rgba(255,255,255,0.02); }
-    .cookie-section { background: rgba(210,153,34,0.08); border: 1px solid var(--warning); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.9rem; }
-    .cookie-section summary { cursor: pointer; font-weight: 600; }
-    .cookie-section p { margin: 0.5rem 0; color: var(--text-muted); }
-    .cookie-section code { background: var(--bg); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.85em; }
     .empty-state { padding: 2.5rem; text-align: center; color: var(--text-muted); font-size: 1rem; }
     .normalized-note { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.25rem; }
     .normalized-toggle { display: inline-flex; align-items: center; cursor: pointer; font-size: 0.9rem; }
@@ -108,18 +104,9 @@
       <h1>あるけみすと 市場価格変動</h1>
       <p class="subtitle">
         <a href="https://games-alchemist.com/myshop/" target="_blank" rel="noopener">games-alchemist.com/myshop</a>
-        の価格を毎時15分・45分に取得。こんぼう/こんぼう+1など個別表示、無印換算は専用ボタンで切り替え（<a href="https://wikiwiki.jp/alchemist-p/%E8%A3%85%E5%82%99" target="_blank" rel="noopener">装備wiki</a>参照）
+        の価格を push_data.py で取得・送信。こんぼう/こんぼう+1など個別表示、無印換算は専用ボタンで切り替え（<a href="https://wikiwiki.jp/alchemist-p/%E8%A3%85%E5%82%99" target="_blank" rel="noopener">装備wiki</a>参照）
       </p>
     </header>
-
-    <div id="cookieWarn" class="status warning" style="display:none;">
-      ⚠️ Cookieの設定から24時間以上経過しています。再設定を推奨します。
-    </div>
-
-    <details class="cookie-section">
-      <summary>⚙️ Cookie設定（ログイン用）</summary>
-      <p>サイトはログインしないと市場が見れません。開発者ツール（F12）→ Application → Cookies から sessionid, csrftoken を取得し、<code>cookies.json</code> に保存してください。</p>
-    </details>
 
     <div id="status"></div>
 
@@ -138,9 +125,6 @@
       </div>
       <div class="control-group" style="align-self: flex-end;">
         <button class="primary" onclick="addToCompare()">比較に追加</button>
-      </div>
-      <div class="control-group" style="align-self: flex-end;">
-        <button class="secondary" onclick="runScrapeNow()">今すぐスクレイピング</button>
       </div>
     </div>
 
@@ -188,12 +172,6 @@
     let compareItems = [];
 
     const CHART_COLORS = ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#a371f7', '#79c0ff', '#ffa657'];
-
-    async function checkCookieStatus() {
-      const r = await fetch('/api/cookie_status');
-      const d = await r.json();
-      document.getElementById('cookieWarn').style.display = d.warn ? 'block' : 'none';
-    }
 
     async function loadItems() {
       const r = await fetch('/api/items');
@@ -300,7 +278,7 @@
       const history = sortedTs.map(t => tsMap[t][baseNamesArr[0]]).filter(Boolean);
 
       if (!history || history.length === 0) {
-        wrap.innerHTML = '<div class="empty-state">データがありません。スクレイピングを実行してください</div><canvas id="priceChart" style="display:none"></canvas>';
+        wrap.innerHTML = '<div class="empty-state">データがありません。push_data.py でデータを送信してください</div><canvas id="priceChart" style="display:none"></canvas>';
         statsEl.innerHTML = '';
         tableBody.innerHTML = '';
         return;
@@ -367,24 +345,6 @@
 
     document.getElementById('periodSelect')?.addEventListener('change', loadChart);
 
-    async function runScrapeNow() {
-      document.getElementById('status').innerHTML = '<div class="status info">スクレイピング中...</div>';
-      try {
-        const r = await fetch('/api/scrape', { method: 'POST' });
-        const data = await r.json();
-        if (data.success) {
-          document.getElementById('status').innerHTML = '<div class="status success">取得成功: ' + Object.keys(data.prices || {}).length + ' アイテム</div>';
-          loadItems();
-          checkCookieStatus();
-        } else {
-          document.getElementById('status').innerHTML = '<div class="status error">' + (data.error || 'エラー') + '</div>';
-        }
-      } catch (e) {
-        document.getElementById('status').innerHTML = '<div class="status error">レート制限: しばらく待ってから再実行してください</div>';
-      }
-    }
-
-    checkCookieStatus();
     loadItems();
   </script>
 </body>
