@@ -3,7 +3,7 @@
 ## 起動方法
 
 ```bash
-cd 自動更新金額変動確認用
+cd auto-check
 python3 -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
