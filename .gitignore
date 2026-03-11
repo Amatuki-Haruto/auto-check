@@ -1,0 +1,8 @@
+venv/
+.env
+cookies.json
+price_history.json
+price_history.json.lock
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>あるけみすと 市場価格変動</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a1f26;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --success: #3fb950;
+      --warning: #d29922;
+      --error: #f85149;
+      --info: #58a6ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    .container { max-width: 1100px; margin: 0 auto; }
+    header { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+    h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 0.5rem 0; }
+    .subtitle { color: var(--text-muted); font-size: 0.95rem; margin: 0; }
+    .subtitle a { color: var(--accent); text-decoration: none; }
+    .subtitle a:hover { text-decoration: underline; }
+    .controls { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1.5rem; }
+    .control-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .control-group label { font-size: 0.85rem; color: var(--text-muted); }
+    input[type="text"], select {
+      padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-size: 0.95rem;
+    }
+    input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent); }
+    input[type="text"] { min-width: 180px; }
+    select { min-width: 160px; cursor: pointer; }
+    button {
+      padding: 0.6rem 1.25rem; border-radius: 8px; border: none;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+    }
+    button.primary { background: var(--accent); color: #fff; }
+    button.primary:hover { opacity: 0.9; }
+    button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    button.secondary:hover { background: var(--border); }
+    .card {
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .card-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 1rem 0; }
+    .chart-wrap { min-height: 320px; margin-bottom: 1rem; position: relative; }
+    .chart-controls { display: flex; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .chart-controls select { min-width: 120px; }
+    .legend { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.75rem; font-size: 0.9rem; }
+    .legend span { display: flex; align-items: center; gap: 0.4rem; }
+    .legend .dot { width: 10px; height: 10px; border-radius: 3px; }
+    .last-update { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
+    .status { padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.95rem; margin-bottom: 1rem; }
+    .status.success { background: rgba(63,185,80,0.15); border: 1px solid var(--success); }
+    .status.error { background: rgba(248,81,73,0.15); border: 1px solid var(--error); }
+    .status.info { background: rgba(88,166,255,0.15); border: 1px solid var(--info); }
+    .status.warning { background: rgba(210,153,34,0.15); border: 1px solid var(--warning); }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .stat-box { background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 8px; border: 1px solid var(--border); }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+    .stat-value { font-size: 1.25rem; font-weight: 600; }
+    .compare-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .compare-tag { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
+    .compare-tag .remove { cursor: pointer; color: var(--text-muted); }
+    .compare-tag .remove:hover { color: var(--error); }
+    .item-picker { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; background: var(--bg); }
+    .item-picker .cat-section { margin-bottom: 0.75rem; }
+    .item-picker .cat-title { font-size: 0.85rem; font-weight: 600; color: var(--accent); margin-bottom: 0.35rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--border); }
+    .item-picker label { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; cursor: pointer; font-size: 0.9rem; }
+    .item-picker label:hover { color: var(--accent); }
+    .item-picker input[type="checkbox"] { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th { text-align: left; padding: 0.75rem 1rem; background: rgba(255,255,255,0.03); font-weight: 600; color: var(--text-muted); font-size: 0.8rem; }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .cookie-section { background: rgba(210,153,34,0.08); border: 1px solid var(--warning); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.9rem; }
+    .cookie-section summary { cursor: pointer; font-weight: 600; }
+    .cookie-section p { margin: 0.5rem 0; color: var(--text-muted); }
+    .cookie-section code { background: var(--bg); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.85em; }
+    .empty-state { padding: 2.5rem; text-align: center; color: var(--text-muted); font-size: 1rem; }
+    .normalized-note { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.25rem; }
+    .normalized-toggle { display: inline-flex; align-items: center; cursor: pointer; font-size: 0.9rem; }
+    .normalized-toggle input { margin-right: 0.35rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>あるけみすと 市場価格変動</h1>
+      <p class="subtitle">
+        <a href="https://games-alchemist.com/myshop/" target="_blank" rel="noopener">games-alchemist.com/myshop</a>
+        の価格を毎時15分・45分に取得。こんぼう/こんぼう+1など個別表示、無印換算は専用ボタンで切り替え（<a href="https://wikiwiki.jp/alchemist-p/%E8%A3%85%E5%82%99" target="_blank" rel="noopener">装備wiki</a>参照）
+      </p>
+    </header>
+
+    <div id="cookieWarn" class="status warning" style="display:none;">
+      ⚠️ Cookieの設定から24時間以上経過しています。再設定を推奨します。
+    </div>
+
+    <details class="cookie-section">
+      <summary>⚙️ Cookie設定（ログイン用）</summary>
+      <p>サイトはログインしないと市場が見れません。開発者ツール（F12）→ Application → Cookies から sessionid, csrftoken を取得し、<code>cookies.json</code> に保存してください。</p>
+    </details>
+
+    <div id="status"></div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>カテゴリ</label>
+        <select id="categorySelect"><option value="">全カテゴリ</option></select>
+      </div>
+      <div class="control-group">
+        <label>アイテム検索</label>
+        <input type="text" id="itemSearch" placeholder="名前で検索...">
+      </div>
+      <div class="control-group">
+        <label>アイテム選択</label>
+        <select id="itemSelect"><option value="">選択...</option></select>
+      </div>
+      <div class="control-group" style="align-self: flex-end;">
+        <button class="primary" onclick="addToCompare()">比較に追加</button>
+      </div>
+      <div class="control-group" style="align-self: flex-end;">
+        <button class="secondary" onclick="runScrapeNow()">今すぐスクレイピング</button>
+      </div>
+    </div>
+
+    <div class="card" id="compareSection" style="display:none;">
+      <div class="card-title">比較中のアイテム</div>
+      <div class="compare-tags" id="compareTags"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">価格推移グラフ</div>
+      <div class="chart-controls">
+        <select id="periodSelect">
+          <option value="7">直近7日</option>
+          <option value="14">直近14日</option>
+          <option value="30">直近30日</option>
+          <option value="all">全期間</option>
+        </select>
+        <label class="normalized-toggle">
+          <input type="checkbox" id="normalizedToggle" onchange="loadChart()">
+          無印換算で表示 <span class="normalized-note">(+1=÷3, +2=÷9...)</span>
+        </label>
+      </div>
+      <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+      <div class="legend" id="chartLegend"></div>
+      <div class="last-update" id="lastUpdate"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">統計</div>
+      <div class="stats-grid" id="statsGrid"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">直近の記録</div>
+      <table>
+        <thead><tr><th>取得日時</th><th>最安値</th><th>最高値</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let priceChart = null;
+    let allItemsData = { items: [], categories: {}, category_names: {} };
+    let compareItems = [];
+
+    const CHART_COLORS = ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#a371f7', '#79c0ff', '#ffa657'];
+
+    async function checkCookieStatus() {
+      const r = await fetch('/api/cookie_status');
+      const d = await r.json();
+      document.getElementById('cookieWarn').style.display = d.warn ? 'block' : 'none';
+    }
+
+    async function loadItems() {
+      const r = await fetch('/api/items');
+      allItemsData = await r.json();
+      const cat = document.getElementById('categorySelect');
+      cat.innerHTML = '<option value="">全カテゴリ</option>';
+      for (const [key, names] of Object.entries(allItemsData.categories || {})) {
+        const label = allItemsData.category_names?.[key] || key;
+        cat.appendChild(new Option(label + ' (' + names.length + ')', key));
+      }
+      updateItemSelect();
+      if (allItemsData.items?.length) {
+        const hasKonbo = allItemsData.items.some(n => n.startsWith('こんぼう'));
+        if (hasKonbo) compareItems = ['こんぼう'];
+        if (compareItems.length) {
+          document.getElementById('compareSection').style.display = 'block';
+          updateCompareTags();
+          loadChart();
+        }
+      }
+    }
+
+    function updateItemSelect() {
+      const cat = document.getElementById('categorySelect').value;
+      const search = document.getElementById('itemSearch').value.toLowerCase();
+      let items = cat ? (allItemsData.categories?.[cat] || []) : (allItemsData.items || []);
+      if (search) items = items.filter(n => n.toLowerCase().includes(search));
+      const sel = document.getElementById('itemSelect');
+      sel.innerHTML = '<option value="">選択...</option>';
+      items.forEach(name => {
+        sel.appendChild(new Option(name, name));
+      });
+    }
+
+    document.getElementById('categorySelect')?.addEventListener('change', updateItemSelect);
+    document.getElementById('itemSearch')?.addEventListener('input', updateItemSelect);
+
+    function getBaseName(name) {
+      const m = name.match(/^(.+?)\s*\+\s*\d+$/);
+      return m ? m[1].trim() : name;
+    }
+
+    function addToCompare() {
+      const sel = document.getElementById('itemSelect');
+      const v = sel.value;
+      if (!v) return;
+      if (!compareItems.includes(v)) {
+        compareItems.push(v);
+        document.getElementById('compareSection').style.display = 'block';
+        updateCompareTags();
+        loadChart();
+      }
+    }
+
+    function removeFromCompare(name) {
+      compareItems = compareItems.filter(n => n !== name);
+      if (compareItems.length === 0) document.getElementById('compareSection').style.display = 'none';
+      updateCompareTags();
+      loadChart();
+    }
+
+    function updateCompareTags() {
+      const el = document.getElementById('compareTags');
+      el.innerHTML = compareItems.map(name => '<span class="compare-tag">' + name + ' <span class="remove" onclick="removeFromCompare(\'' + name.replace(/'/g, "\\'") + '\')">×</span></span>').join('');
+    }
+
+    async function loadChart() {
+      const period = document.getElementById('periodSelect').value;
+      const wrap = document.querySelector('.chart-wrap');
+      const statsEl = document.getElementById('statsGrid');
+      const tableBody = document.getElementById('tableBody');
+      const lastUpdate = document.getElementById('lastUpdate');
+
+      if (compareItems.length === 0) {
+        if (priceChart) { priceChart.destroy(); priceChart = null; }
+        wrap.innerHTML = '<div class="empty-state">比較するアイテムを選択し「比較に追加」をクリックしてください</div><canvas id="priceChart" style="display:none"></canvas>';
+        statsEl.innerHTML = '';
+        tableBody.innerHTML = '';
+        return;
+      }
+
+      const normalized = document.getElementById('normalizedToggle')?.checked || false;
+      const itemsParam = normalized
+        ? [...new Set(compareItems.map(getBaseName))].map(encodeURIComponent).join(',')
+        : compareItems.map(encodeURIComponent).join(',');
+      const r = await fetch('/api/compare?items=' + itemsParam + '&normalized=' + (normalized ? '1' : '0'));
+      const data = await r.json();
+
+      const allHistory = data.items || {};
+      const baseNamesArr = Object.keys(allHistory);
+
+      const now = Date.now();
+      const periodMs = period === 'all' ? Infinity : parseInt(period) * 24 * 60 * 60 * 1000;
+
+      const tsMap = {};
+      baseNamesArr.forEach(base => {
+        (allHistory[base] || []).filter(h => now - new Date(h.timestamp).getTime() <= periodMs)
+          .forEach(h => {
+            if (!tsMap[h.timestamp]) tsMap[h.timestamp] = {};
+            tsMap[h.timestamp][base] = h;
+          });
+      });
+      const sortedTs = Object.keys(tsMap).sort();
+      const history = sortedTs.map(t => tsMap[t][baseNamesArr[0]]).filter(Boolean);
+
+      if (!history || history.length === 0) {
+        wrap.innerHTML = '<div class="empty-state">データがありません。スクレイピングを実行してください</div><canvas id="priceChart" style="display:none"></canvas>';
+        statsEl.innerHTML = '';
+        tableBody.innerHTML = '';
+        return;
+      }
+
+      if (wrap.querySelector('.empty-state')) wrap.innerHTML = '<canvas id="priceChart"></canvas>';
+
+      const labels = sortedTs;
+      const datasets = [];
+      const legendHtml = [];
+      baseNamesArr.forEach((baseName, i) => {
+        const color = CHART_COLORS[i % CHART_COLORS.length];
+        const minData = sortedTs.map(t => tsMap[t]?.[baseName]?.min).filter(v => v != null);
+        const maxData = sortedTs.map(t => tsMap[t]?.[baseName]?.max).filter(v => v != null);
+        if (minData.length === 0) return;
+        datasets.push({ label: baseName + ' 最安', data: sortedTs.map(t => tsMap[t]?.[baseName]?.min), borderColor: color, backgroundColor: color + '30', fill: false, tension: 0.3 });
+        datasets.push({ label: baseName + ' 最高', data: sortedTs.map(t => tsMap[t]?.[baseName]?.max), borderColor: color, borderDash: [4,4], fill: false, tension: 0.3 });
+        legendHtml.push('<span style="color:' + color + '">■</span> ' + baseName);
+      });
+
+      document.getElementById('chartLegend').innerHTML = legendHtml.join(' &nbsp; ');
+
+      if (priceChart) priceChart.destroy();
+      priceChart = new Chart(document.getElementById('priceChart'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#8b949e' } },
+            x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#8b949e', maxRotation: 45 } }
+          },
+          interaction: { intersect: false, mode: 'index' }
+        }
+      });
+
+      const vals = sortedTs.flatMap(t => baseNamesArr.flatMap(b => {
+        const h = tsMap[t]?.[b];
+        return h ? [h.min, h.max] : [];
+      })).filter(v => v != null);
+      if (vals.length === 0) return;
+      const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+      const sorted = [...vals].sort((a,b)=>a-b);
+      const median = sorted.length % 2 ? sorted[Math.floor(sorted.length/2)] : (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const std = Math.sqrt(vals.reduce((s,x)=>s+(x-avg)**2,0)/vals.length) || 0;
+
+      statsEl.innerHTML = '<div class="stat-box"><div class="stat-label">最安値</div><div class="stat-value">' + min.toFixed(1) + '</div></div>' +
+        '<div class="stat-box"><div class="stat-label">最高値</div><div class="stat-value">' + max.toFixed(1) + '</div></div>' +
+        '<div class="stat-box"><div class="stat-label">平均</div><div class="stat-value">' + avg.toFixed(1) + '</div></div>' +
+        '<div class="stat-box"><div class="stat-label">中央値</div><div class="stat-value">' + median.toFixed(1) + '</div></div>' +
+        '<div class="stat-box"><div class="stat-label">標準偏差</div><div class="stat-value">' + std.toFixed(1) + '</div></div>' +
+        '<div class="stat-box"><div class="stat-label">データ数</div><div class="stat-value">' + history.length + '</div></div>';
+
+      tableBody.innerHTML = history.slice(-15).reverse().map(h => {
+        const d = new Date(h.timestamp);
+        return '<tr><td>' + d.toLocaleString('ja-JP') + '</td><td>' + h.min.toFixed(1) + '</td><td>' + h.max.toFixed(1) + '</td></tr>';
+      }).join('');
+
+      lastUpdate.textContent = '最終: ' + history[history.length-1].timestamp;
+    }
+
+    document.getElementById('periodSelect')?.addEventListener('change', loadChart);
+
+    async function runScrapeNow() {
+      document.getElementById('status').innerHTML = '<div class="status info">スクレイピング中...</div>';
+      try {
+        const r = await fetch('/api/scrape', { method: 'POST' });
+        const data = await r.json();
+        if (data.success) {
+          document.getElementById('status').innerHTML = '<div class="status success">取得成功: ' + Object.keys(data.prices || {}).length + ' アイテム</div>';
+          loadItems();
+          checkCookieStatus();
+        } else {
+          document.getElementById('status').innerHTML = '<div class="status error">' + (data.error || 'エラー') + '</div>';
+        }
+      } catch (e) {
+        document.getElementById('status').innerHTML = '<div class="status error">レート制限: しばらく待ってから再実行してください</div>';
+      }
+    }
+
+    checkCookieStatus();
+    loadItems();
+  </script>
+</body>
+</html>
